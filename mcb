@@ -28,8 +28,6 @@ done
 shift `expr $OPTIND - 1`
 
 CMDNAME=`basename $0` ; bin_dir=`dirname $0`
-in_args="$@"
-
 umask 002
 base_dir="${jail_dir}/${mc_server}"
 bs_bin="${base_dir}/bedrock_server"
@@ -94,9 +92,17 @@ print_running_info() {
 
 
 # Main loop around input commands!
-for arg in $in_args
+cmd_p=0
+for arg in "$@"
 do
-  if [ "start" = "$arg" ] ; then
+  if [ "$cmd_p" -eq 1 ] ; then
+    cmd_p=0 ; screen -Rd $mc_server -X stuff "${arg}$(printf '\r')"
+  elif [ "cmd" = "$arg" ] ; then
+    # Next argument is the command to send to the running bedrock_server.
+    # Rember to enclose your command string in single quotes on the command line!
+    cmd_p=1 ; continue
+
+  elif [ "start" = "$arg" ] ; then
     # Call this from your SystemD *.service file.  It will also work interactively.
 
     mc_screen_session $mc_server  # Sets sc_sess.
@@ -180,9 +186,6 @@ do
       echo "TODO: Waiting not yet implemented." 1>&2
     fi
 
-  elif [ "cmd" = "$arg" ] ; then
-    # Next argument is the command to send to the running bedrock_server.
-    echo "TODO: ${CMDNAME}: $arg"
   else
     echo "Error: ${CMDNAME}: Unknown command argument:  $arg" 1>&2
   fi
