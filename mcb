@@ -5,16 +5,17 @@
 # screen, started via SystemD systemctl.
 
 
-mc_server=mc-1
-jail_dir=/data/jails/mc-1
+mc_user=mc ; mc_server=mc-1 ; jail_dir=/data/jails/mc-1
 
 print_help_only_p=0
-while getopts hs: OPT
+while getopts hs:u: OPT
 do
   case $OPT in
     h)  print_help_only_p=1
         ;;
     s)  mc_server=$OPTARG
+        ;;
+    u)  mc_user=$OPTARG
         ;;
     \?)
         echo 1>&2
@@ -60,7 +61,6 @@ if [ "$bad_args_exit_p" -ne 0 ] ; then exit ; fi
 
 cd "$base_dir"
 mkdir -p logs backups
-#PATH="~/bin:~/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
 
 
 # Note, I ASSUME that our Bourne shell always has SEPARATE positional
@@ -76,9 +76,17 @@ mkdir -p logs backups
 # with "sudo -u mc".
 #
 mc_screen_session() {
-  local foo ; foo=$(screen -wipe 2>&1)
+  local mc_server mc_user foo
+  mc_server="$1" ; mc_user="$2"
   # sc_sess is purposely global!
-  sc_sess=`screen -list | grep "$1" | head -n 1 | awk '{print($1)}'`
+  if [ -z "$mc_user" ] ; then
+    foo=$(screen -wipe 2>&1)
+    sc_sess=`screen -list | grep "$mc_server" | head -n 1 | awk '{print($mc_server)}'`
+  else
+    foo=$(sudo -u $mc_user screen -wipe 2>&1)
+    sc_sess=`sudo -u $mc_user screen -list | grep "$mc_server" | head -n 1 | awk '{print($mc_server)}'`
+  fi
+
 }
 
 print_running_info() {
@@ -105,7 +113,7 @@ do
   elif [ "start" = "$arg" ] ; then
     # Call this from your SystemD *.service file.  It will also work interactively.
 
-    mc_screen_session $mc_server  # Sets sc_sess.
+    mc_screen_session $mc_server ''  # Sets sc_sess.
     if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
     if [ 1 -eq "$running_p" ] ; then
       echo "Minecraft Server $mc_server is already running under screen!" 1>&2
@@ -118,7 +126,7 @@ do
     fi
 
   elif [ "status" = "$arg" ] ; then
-    mc_screen_session $mc_server  # Sets sc_sess.
+    mc_screen_session $mc_server ''  # Sets sc_sess.
     if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
     wait_pid=`echo "$sc_sess" | awk -F. '{print($1)}'`
     echo "Minecraft Server $mc_server running yes-1 or no-0:  $running_p  Shell pid:  $wait_pid"
@@ -134,7 +142,7 @@ do
     # But for now we will NOT use that, so that this command can work the
     # same way both under SystemD and not.
 
-    mc_screen_session $mc_server  # Sets sc_sess.
+    mc_screen_session $mc_server ''  # Sets sc_sess.
     if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
     if [ 0 -eq "$running_p" ] ; then
       echo "Error: ${CMDNAME}: ${arg}:  Minecraft Server $mc_server is down, or NOT running under screen." 1>&2
@@ -166,10 +174,25 @@ do
       kill $wait_pid
     fi
 
-  elif [ "restart" = "$arg" ] ; then
-    echo "TODO: ${CMDNAME}: $arg"
   elif [ "backup" = "$arg" ] ; then
-    echo "TODO: ${CMDNAME}: $arg"
+    # Stop the server first!  Make sure SystemD does NOT restart it until
+    # we are done.  Run this as your normal Linux user, NOT the less
+    # privileged mc.
+
+    mc_screen_session $mc_server $mc_user  # Sets sc_sess.
+    if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
+    if [ 1 -eq "$running_p" ] ; then
+      echo "Error: ${CMDNAME}: Cannot backup, server is still running!  Run d-stop first." 1>&2
+      print_running_info $base_dir $mc_server
+      continue
+    fi
+    if [ ! -d "worlds" ] ; then
+      echo "Error: ${CMDNAME}: Cannot backup, no worlds directory found in:  $base_dir" 1>&2
+      continue
+    fi
+    f_bak="${base_dir}/backups/${mc_server}.$(date +%Y-%m-%dT%H:%M:%S).tar.zst"
+    echo "Backing up server $mc_server to:  $f_bak"
+    tar -I zstd -pcf "$f_bak" worlds
 
   elif [ "d-start" = "$arg" ] ; then
     # First install the file into /etc/systemd/system/ yourself.
