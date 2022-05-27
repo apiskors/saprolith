@@ -1,0 +1,143 @@
+#!/bin/sh
+#
+# Start/stop control script for the Minecraft Bedrock Edition server.
+# This runs the Mojang/Microsoft Minecraft Bedrock Server under
+# screen, started via SystemD systemctl.
+
+
+mc_server=mc-1
+jail_dir=/data/jails/mc-1
+
+print_help_only_p=0
+while getopts hs: OPT
+do
+  case $OPT in
+    h)  print_help_only_p=1
+        ;;
+    s)  mc_server=$OPTARG
+        ;;
+    \?)
+        echo 1>&2
+        echo "ERROR:  One or more bad command line options." 1>&2
+        echo 1>&2
+        echo "$USAGE" 1>&2
+        exit 1
+        ;;
+  esac
+done
+shift `expr $OPTIND - 1`
+
+CMDNAME=`basename $0` ; bin_dir=`dirname $0`
+in_args="$@"
+
+umask 002
+base_dir="${jail_dir}/${mc_server}"
+bs_bin="${base_dir}/bedrock_server"
+mc_service="${mc_server}.service"
+
+
+USAGE="Usage:  ${CMDNAME} [-h] [-s SERVER_NAME] CMD [CMD ...]
+Description:
+  This runs the Mojang/Microsoft Minecraft Bedrock Server on Linux
+  under screen, preferably started via SystemD systemctl.
+Options:
+  -h : Show this help.
+  -s  SERVER_NAME  :  Short name of server.  Currently:  $mc
+      Base directory of server will be:  $base_dir
+Commands:  status start stop restart
+"
+
+
+bad_args_exit_p=0
+if [ "$print_help_only_p" -eq 1 ]
+then
+  bad_args_exit_p=1
+  echo "$USAGE"
+elif [ "$1" = "" ] ; then
+  bad_args_exit_p=1
+  echo "Error: You must give a at least one positional command argument." 1>&2
+fi
+if [ "$bad_args_exit_p" -ne 0 ] ; then exit ; fi
+
+
+cd "$base_dir"
+mkdir -p logs backups
+#PATH="~/bin:~/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+
+
+server_screen_running_p() {
+  # Return 1 if the input server is already running under screen, 0 if
+  # not.  This ONLY works if the server is running under screen, AND as
+  # the SAME user as this script.
+
+  sw_out=$(screen -wipe 2>&1)
+  sl_out=`screen -list | grep "$1"`
+  if [ "" = "$sl_out" ] ; then
+    running_p=0
+  else
+    running_p=1
+  fi
+  return $running_p
+}
+
+print_running_info () {
+  f_log=`ls -1t ${1}/logs/${2}.* | head -n 1`
+  echo "Log file is probably:  $f_log"
+  echo "To get to its Server console do:  screen -e^Oo -r $mc_server"
+  echo "Disconnect from that screen session with:  Ctrl-o d"
+  echo "Of if it is a second inner screen session, disconnect with:  Ctrl-o o d"
+}
+
+
+# Main loop around input commands!
+for arg in $in_args
+do
+  if [ "start" = "$arg" ] ; then
+    server_screen_running_p $mc_server ; running_p=$?
+    f_log="${base_dir}/logs/${mc_server}.$(date +%Y-%m-%dT%H:%M:%S).log"
+    if [ 1 -eq "$running_p" ] ; then
+      echo "Minecraft Server $mc_server is already running under screen!" 1>&2
+      print_running_info $base_dir $mc_server
+    else
+      echo "Starting Minecraft Server:  $mc_server  As Linux user:  `whoami`"
+      echo "Logging to file:  $f_log"
+      screen -e^Oo -L -Logfile $f_log -dm -S $mc_server /bin/sh -c "LD_LIBRARY_PATH=$base_dir $bs_bin"
+    fi
+
+  elif [ "status" = "$arg" ] ; then
+    server_screen_running_p $mc_server ; running_p=$?
+    echo "Minecraft Server $mc_server running yes-1 or no-0:  $running_p"
+    if [ 1 -eq "$running_p" ] ; then
+      print_running_info $base_dir $mc_server
+    fi
+
+  elif [ "stop" = "$arg" ] ; then
+    echo "Stopping Minecraft Server:  $mc_server"
+    screen -Rd $mc_server -X stuff "say Stopping server...$(printf '\r')"
+    screen -Rd $mc_server -X stuff "stop$(printf '\r')"
+
+  elif [ "restart" = "$arg" ] ; then
+    echo "TODO: ${CMDNAME}: $arg"
+  elif [ "backup" = "$arg" ] ; then
+    echo "TODO: ${CMDNAME}: $arg"
+
+  elif [ "d-start" = "$arg" ] ; then
+    # First install the file into /etc/systemd/system/ yourself.
+    systemctl daemon-reload
+    systemctl start $mc_service
+
+  elif [ "d-stop" = "$arg" ] ; then
+    systemctl stop $mc_service
+
+  elif [ "wait-network" = "$arg" ] ; then
+    dflt_gateway=$(/sbin/route -n | gawk '$4 == "UG" {print $2}')
+    if [ "" = "$dflt_gateway" ] ; then
+      echo "Warning: ${CMDNAME}: Network is not up yet." 1>&2
+    fi
+
+  elif [ "cmd" = "$arg" ] ; then
+    echo "TODO: ${CMDNAME}: $arg"
+  else
+    echo "Error: ${CMDNAME}: Unknown command argument:  $arg" 1>&2
+  fi
+done
