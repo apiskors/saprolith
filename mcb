@@ -65,25 +65,29 @@ mkdir -p logs backups
 #PATH="~/bin:~/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
 
 
-server_screen_running_p() {
-  # Return 1 if the input server is already running under screen, 0 if
-  # not.  This ONLY works if the server is running under screen, AND as
-  # the SAME user as this script.
+# Note, I ASSUME that our Bourne shell always has SEPARATE positional
+# parameter lists for individual functions vs. the whole script.  AKA,
+# do not use some ancient non-Linux Bourne shell.
 
-  sw_out=$(screen -wipe 2>&1)
-  sl_out=`screen -list | grep "$1"`
-  if [ "" = "$sl_out" ] ; then
-    running_p=0
-  else
-    running_p=1
-  fi
-  return $running_p
+
+# Return the screen session running this mc_server, if there is one.
+# If not, return empty string.
+#
+# Normally bedrock_server will be running as our user "mc", so for
+# this to work this script MUST run as the same user.  AKA, invoke it
+# with "sudo -u mc".
+#
+mc_screen_session() {
+  local foo ; foo=$(screen -wipe 2>&1)
+  # sc_sess is purposely global!
+  sc_sess=`screen -list | grep "$1" | head -n 1 | awk '{print($1)}'`
 }
 
-print_running_info () {
+print_running_info() {
+  local f_log
   f_log=`ls -1t ${1}/logs/${2}.* | head -n 1`
   echo "Log file is probably:  $f_log"
-  echo "To get to its Server console do:  screen -e^Oo -r $mc_server"
+  echo "To get to its Server console do:  screen -e^Oo -r ${2}"
   echo "Disconnect from that screen session with:  Ctrl-o d"
   echo "Of if it is a second inner screen session, disconnect with:  Ctrl-o o d"
 }
@@ -93,19 +97,21 @@ print_running_info () {
 for arg in $in_args
 do
   if [ "start" = "$arg" ] ; then
-    server_screen_running_p $mc_server ; running_p=$?
-    f_log="${base_dir}/logs/${mc_server}.$(date +%Y-%m-%dT%H:%M:%S).log"
+    mc_screen_session $mc_server  # Sets sc_sess.
+    if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
     if [ 1 -eq "$running_p" ] ; then
       echo "Minecraft Server $mc_server is already running under screen!" 1>&2
       print_running_info $base_dir $mc_server
     else
+      f_log="${base_dir}/logs/${mc_server}.$(date +%Y-%m-%dT%H:%M:%S).log"
       echo "Starting Minecraft Server:  $mc_server  As Linux user:  `whoami`"
       echo "Logging to file:  $f_log"
       screen -e^Oo -L -Logfile $f_log -dm -S $mc_server /bin/sh -c "LD_LIBRARY_PATH=$base_dir $bs_bin"
     fi
 
   elif [ "status" = "$arg" ] ; then
-    server_screen_running_p $mc_server ; running_p=$?
+    mc_screen_session $mc_server  # Sets sc_sess.
+    if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
     echo "Minecraft Server $mc_server running yes-1 or no-0:  $running_p"
     if [ 1 -eq "$running_p" ] ; then
       print_running_info $base_dir $mc_server
@@ -130,12 +136,14 @@ do
     systemctl stop $mc_service
 
   elif [ "wait-network" = "$arg" ] ; then
-    dflt_gateway=$(/sbin/route -n | gawk '$4 == "UG" {print $2}')
+    dflt_gateway=$(/sbin/route -n | awk '$4 == "UG" {print $2}')
     if [ "" = "$dflt_gateway" ] ; then
       echo "Warning: ${CMDNAME}: Network is not up yet." 1>&2
+      echo "TODO: Waiting not yet implemented." 1>&2
     fi
 
   elif [ "cmd" = "$arg" ] ; then
+    # Next argument is the command to send to the running bedrock_server.
     echo "TODO: ${CMDNAME}: $arg"
   else
     echo "Error: ${CMDNAME}: Unknown command argument:  $arg" 1>&2
