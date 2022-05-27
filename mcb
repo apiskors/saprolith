@@ -97,6 +97,8 @@ print_running_info() {
 for arg in $in_args
 do
   if [ "start" = "$arg" ] ; then
+    # Call this from your SystemD *.service file.  It will also work interactively.
+
     mc_screen_session $mc_server  # Sets sc_sess.
     if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
     if [ 1 -eq "$running_p" ] ; then
@@ -112,15 +114,51 @@ do
   elif [ "status" = "$arg" ] ; then
     mc_screen_session $mc_server  # Sets sc_sess.
     if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
-    echo "Minecraft Server $mc_server running yes-1 or no-0:  $running_p"
+    wait_pid=`echo "$sc_sess" | awk -F. '{print($1)}'`
+    echo "Minecraft Server $mc_server running yes-1 or no-0:  $running_p  Shell pid:  $wait_pid"
     if [ 1 -eq "$running_p" ] ; then
       print_running_info $base_dir $mc_server
     fi
 
   elif [ "stop" = "$arg" ] ; then
-    echo "Stopping Minecraft Server:  $mc_server"
-    screen -Rd $mc_server -X stuff "say Stopping server...$(printf '\r')"
+    # Call this from your SystemD *.service file.  It will also work interactively.
+    #
+    # SystemD can report the tree of PIDs like this:
+    #   systemctl status mc-1.service
+    # But for now we will NOT use that, so that this command can work the
+    # same way both under SystemD and not.
+
+    mc_screen_session $mc_server  # Sets sc_sess.
+    if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
+    if [ 0 -eq "$running_p" ] ; then
+      echo "Error: ${CMDNAME}: ${arg}:  Minecraft Server $mc_server is down, or NOT running under screen." 1>&2
+      continue
+    fi
+    wait_pid=`echo "$sc_sess" | awk -F. '{print($1)}'`
+
+    echo "Stopping Minecraft Server:  $mc_server  Child of shell pid:  $wait_pid"
+    screen -Rd $mc_server -X stuff "say Stopping server right now!$(printf '\r')"
     screen -Rd $mc_server -X stuff "stop$(printf '\r')"
+    running_p=1 ; ii=0
+    while [ "$running_p" -eq 1 -a "$ii" -lt 20 ] ; do
+      running_p=`pgrep -cg $wait_pid`
+      if [ "$running_p" -eq 0 ] ; then break ; fi
+      sleep 1 ; ii=$((++ii))
+    done
+
+    if [ "$running_p" -eq 1 ] ; then
+      echo "Warning: Server $mc_server still running, killing screen session."
+      screen -S $mc_server -X quit
+    fi
+    ii=0 ; while [ "$running_p" -eq 1 -a "$ii" -lt 10 ] ; do
+      running_p=`pgrep -cg $wait_pid`
+      if [ "$running_p" -eq 0 ] ; then break ; fi
+      sleep 1 ; ii=$((++ii))
+    done
+    if [ "$running_p" -eq 1 ] ; then
+      echo "Error: Server $mc_server still running, kill it!."
+      kill $wait_pid
+    fi
 
   elif [ "restart" = "$arg" ] ; then
     echo "TODO: ${CMDNAME}: $arg"
