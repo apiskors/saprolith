@@ -5,13 +5,14 @@
 # screen, started via SystemD systemctl.
 
 
+# Defaults, you may want to change these:
 mc_user=mc ; mc_server=mc-1
 jail_dir=/data/jails/mc-1
-# See base_dir below, where the individual server actually lives.
 bak_dir=/data/jails/mc-1/mc-backups
+# See also base_dir below, where the individual server actually lives.
 
 
-print_help_only_p=0
+print_help_only_p=0 ; bad_args_exit_p=0
 while getopts hs:u: OPT
 do
   case $OPT in
@@ -22,11 +23,9 @@ do
     u)  mc_user=$OPTARG
         ;;
     \?)
-        echo 1>&2
+        print_help_only_p=1
         echo "ERROR:  One or more bad command line options." 1>&2
         echo 1>&2
-        echo "$USAGE" 1>&2
-        exit 1
         ;;
   esac
 done
@@ -37,29 +36,31 @@ umask 002
 base_dir="${jail_dir}/${mc_server}"
 bs_bin="${base_dir}/bedrock_server"
 mc_service="${mc_server}.service"
+mc_restart_timer="${mc_server}_restart.timer"
+mc_restart_serv="${mc_server}_restart.service"
 cd "$base_dir" ; mkdir -p logs
+script_user=`whoami`
 
 
 USAGE="Usage:  ${CMDNAME} [-h] [-s SERVER_NAME] CMD [CMD ...]
 Description:
   This runs the Mojang/Microsoft Minecraft Bedrock Server on Linux
   under screen, preferably started via SystemD systemctl.
+Commands:
+  status d-status d-stop backup d-start [etc.]
 Options:
   -h : Show this help.
-  -s  SERVER_NAME  :  Short name of server.  Currently:  $mc
+  -s  SERVER_NAME  :  Short name of server.  Currently:  $mc_server
       Base directory of server will be:  $base_dir
-Commands:  status start stop restart
+  -u : Linux user that will run the server.  Currently:  $mc_user
 "
 
 
-bad_args_exit_p=0
-if [ "$print_help_only_p" -eq 1 ]
-then
-  bad_args_exit_p=1
-  echo "$USAGE"
+if [ "$print_help_only_p" -eq 1 ] ; then
+  bad_args_exit_p=1 ; echo "$USAGE"
 elif [ "$1" = "" ] ; then
   bad_args_exit_p=1
-  echo "Error: You must give a at least one positional command argument." 1>&2
+  echo "Error: You must give at least one positional command argument." 1>&2
 fi
 if [ "$bad_args_exit_p" -ne 0 ] ; then exit ; fi
 
@@ -71,16 +72,11 @@ if [ "$bad_args_exit_p" -ne 0 ] ; then exit ; fi
 
 # Return the screen session running this mc_server, if there is one.
 # If not, return empty string.
-#
-# Normally bedrock_server will be running as our user "mc", so for
-# this to work this script MUST run as the same user.  AKA, invoke it
-# with "sudo -u mc".
-#
 mc_screen_session() {
   local mc_server mc_user foo
   mc_server="$1" ; mc_user="$2"
   # sc_sess is purposely global!
-  if [ -z "$mc_user" ] ; then
+  if [ -z "$mc_user" || "$mc_user" = "$script_user" ] ; then
     foo=$(screen -wipe 2>&1)
     sc_sess=`screen -list | grep "$mc_server" | head -n 1 | awk '{print($mc_server)}'`
   else
@@ -112,7 +108,8 @@ do
     cmd_p=1 ; continue
 
   elif [ "start" = "$arg" ] ; then
-    # Call this from your SystemD *.service file.  It will also work interactively.
+    # Call this from your SystemD *.service file.
+    # It will also work interactively, but you usually do not want to do that.
 
     mc_screen_session $mc_server ''  # Sets sc_sess.
     if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
@@ -121,7 +118,7 @@ do
       print_running_info $base_dir $mc_server
     else
       f_log="${base_dir}/logs/${mc_server}.$(date +%Y-%m-%dT%H-%M-%S).log"
-      echo "Starting Minecraft Server:  $mc_server  As Linux user:  `whoami`"
+      echo "Starting Minecraft Server:  $mc_server  As Linux user:  $script_user"
       echo "Logging to file:  $f_log"
       screen -e^Oo -L -Logfile $f_log -dm -S $mc_server /bin/sh -c "LD_LIBRARY_PATH=$base_dir $bs_bin"
     fi
@@ -136,7 +133,8 @@ do
     fi
 
   elif [ "stop" = "$arg" ] ; then
-    # Call this from your SystemD *.service file.  It will also work interactively.
+    # Call this from your SystemD *.service file.
+    # It will also work interactively, but you usually do not want to do that.
     #
     # SystemD can report the tree of PIDs like this:
     #   systemctl status mc-1.service
@@ -162,7 +160,7 @@ do
     done
 
     if [ "$running_p" -eq 1 ] ; then
-      echo "Warning: Server $mc_server still running, killing screen session."
+      echo "Warning: Server $mc_server still running, killing screen session." 1>&2
       screen -S $mc_server -X quit
     fi
     ii=0 ; while [ "$running_p" -eq 1 -a "$ii" -lt 10 ] ; do
@@ -171,14 +169,13 @@ do
       sleep 1 ; ii=$((++ii))
     done
     if [ "$running_p" -eq 1 ] ; then
-      echo "Error: Server $mc_server still running, kill it!."
+      echo "Error: Server $mc_server still running, killing it now!" 1>&2
       kill $wait_pid
     fi
 
   elif [ "backup" = "$arg" ] ; then
     # Stop the server first!  Make sure SystemD does NOT restart it until
-    # we are done.  Run this as your normal Linux user, NOT the less
-    # privileged mc.
+    # we are done.
 
     mc_screen_session $mc_server $mc_user  # Sets sc_sess.
     if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
@@ -197,16 +194,29 @@ do
     echo "Backing up server $mc_server to:  $f_bak"
     cd "$jail_dir"
 
-    tar -I zstd -pcf "$f_bak" ${mc_server}/*.json ${mc_server}/worlds
+    tar -I zstdmt -pcf "$f_bak" ${mc_server}/*.json ${mc_server}/worlds
     cd "$base_dir"
 
-  elif [ "d-start" = "$arg" ] ; then
-    # First install the file into /etc/systemd/system/ yourself.
+  elif [ "d-reload" = "$arg" ] ; then
+    # See install instructions in readme.txt.
     systemctl daemon-reload
+    systemctl enable $mc_service
+    systemctl enable $mc_restart_timer
+    systemctl enable $mc_restart_serv
+
+  elif [ "d-status" = "$arg" ] ; then
+    systemctl status $mc_service
+    systemctl status $mc_restart_timer
+    systemctl status $mc_restart_serv
+    # See also:  journalctl -u $mc_service
+
+  elif [ "d-start" = "$arg" ] ; then
     systemctl start $mc_service
+    systemctl start $mc_restart_timer
 
   elif [ "d-stop" = "$arg" ] ; then
     systemctl stop $mc_service
+    systemctl stop $mc_restart_timer
 
   elif [ "wait-network" = "$arg" ] ; then
     dflt_gateway=$(/sbin/route -n | awk '$4 == "UG" {print $2}')
