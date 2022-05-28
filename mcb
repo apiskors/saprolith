@@ -200,7 +200,7 @@ do
   elif [ "d-reload" = "$arg" ] ; then
     # See install instructions in readme.txt.
     systemctl daemon-reload
-    systemctl enable $mc_service $mc_restart_timer $mc_restart_serv
+    systemctl enable $mc_service $mc_restart_timer
 
   elif [ "d-status" = "$arg" ] ; then
     systemctl status $mc_service $mc_restart_timer $mc_restart_serv
