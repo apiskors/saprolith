@@ -14,11 +14,28 @@ TimeoutStartSec=60
 Restart=on-failure
 RestartSec=5
 
-ProtectSystem=full
-ProtectHome=read-only
 NoNewPrivileges=true
 PrivateDevices=true
 MemoryDenyWriteExecute=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+
+ProtectSystem=full
+ProtectHome=true
+ReadOnlyDirectories=/lib
+InaccessibleDirectories=/home
+InaccessibleDirectories=/boot
+InaccessibleDirectories=-/var
+InaccessibleDirectories=-/media
+ReadOnlyDirectories=/data
+ReadWriteDirectories=/data/jails/mc-1/%I
+InaccessibleDirectories=-/data/bak
+InaccessibleDirectories=-/data/pub
+InaccessibleDirectories=-/data/vmhome
+InaccessibleDirectories=-/data/atpstuff
 
 [Install]
 WantedBy=multi-user.target
