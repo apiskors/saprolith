@@ -3,7 +3,8 @@ Description=Minecraft %I daily restart and backup
 After=network-online.target local-fs.target
 
 [Service]
-User=mc
+# We must run as root so we can stop/start the mcb@.service without a password.
+User=root
 Group=mc
 WorkingDirectory=/data/jails/mc-1/%I
 ExecStart=/bin/sh /data/jails/mc-1/saprolith/mcb -s %I d-stop backup d-start
