@@ -120,7 +120,7 @@ do
       echo "Minecraft Server $mc_server is already running under screen!" 1>&2
       print_running_info $base_dir $mc_server
     else
-      f_log="${base_dir}/logs/${mc_server}.$(date +%Y-%m-%dT%H:%M:%S).log"
+      f_log="${base_dir}/logs/${mc_server}.$(date +%Y-%m-%dT%H-%M-%S).log"
       echo "Starting Minecraft Server:  $mc_server  As Linux user:  `whoami`"
       echo "Logging to file:  $f_log"
       screen -e^Oo -L -Logfile $f_log -dm -S $mc_server /bin/sh -c "LD_LIBRARY_PATH=$base_dir $bs_bin"
@@ -192,9 +192,11 @@ do
       continue
     fi
 
-    f_bak="${bak_dir}/${mc_server}.$(date +%Y-%m-%dT%H:%M:%S).tar.zst"
+    # Colons in the tarball filename will confuse tar, avoid them.
+    f_bak="${bak_dir}/${mc_server}.$(date +%Y-%m-%dT%H-%M-%S).tar.zst"
     echo "Backing up server $mc_server to:  $f_bak"
     cd "$jail_dir"
+
     tar -I zstd -pcf "$f_bak" ${mc_server}/*.json ${mc_server}/worlds
     cd "$base_dir"
 
