@@ -1,0 +1,21 @@
+[Unit]
+Description=Minecraft %I daily restart and backup
+After=network-online.target local-fs.target
+
+[Service]
+User=mc
+Group=mc
+WorkingDirectory=/data/jails/mc-1/%I
+ExecStart=/bin/sh /data/jails/mc-1/saprolith/mcb -s %I d-stop backup d-start
+Type=simple
+TimeoutStartSec=60
+Restart=no
+
+ProtectSystem=full
+ProtectHome=read-only
+NoNewPrivileges=true
+PrivateDevices=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

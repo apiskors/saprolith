@@ -6,7 +6,7 @@
 
 
 # Defaults, you may want to change these:
-mc_user=mc ; mc_server=mc-1
+mc_user=mc ; mc_server=mc1
 jail_dir=/data/jails/mc-1
 bak_dir=/data/jails/mc-1/mc-backups
 # See also base_dir below, where the individual server actually lives.
@@ -35,9 +35,9 @@ CMDNAME=`basename $0` ; bin_dir=`dirname $0`
 umask 002
 base_dir="${jail_dir}/${mc_server}"
 bs_bin="${base_dir}/bedrock_server"
-mc_service="${mc_server}.service"
-mc_restart_timer="${mc_server}_restart.timer"
-mc_restart_serv="${mc_server}_restart.service"
+      mc_service="mcb@${mc_server}.service"
+mc_restart_timer="mcb_restart@${mc_server}.timer"
+ mc_restart_serv="mcb_restart@${mc_server}.service"
 cd "$base_dir" ; mkdir -p logs
 script_user=`whoami`
 
@@ -76,7 +76,7 @@ mc_screen_session() {
   local mc_server mc_user foo
   mc_server="$1" ; mc_user="$2"
   # sc_sess is purposely global!
-  if [ -z "$mc_user" || "$mc_user" = "$script_user" ] ; then
+  if [ -z "$mc_user" -o "$mc_user" = "$script_user" ] ; then
     foo=$(screen -wipe 2>&1)
     sc_sess=`screen -list | grep "$mc_server" | head -n 1 | awk '{print($mc_server)}'`
   else
@@ -137,7 +137,7 @@ do
     # It will also work interactively, but you usually do not want to do that.
     #
     # SystemD can report the tree of PIDs like this:
-    #   systemctl status mc-1.service
+    #   systemctl status mcb@mc1.service
     # But for now we will NOT use that, so that this command can work the
     # same way both under SystemD and not.
 
@@ -200,23 +200,17 @@ do
   elif [ "d-reload" = "$arg" ] ; then
     # See install instructions in readme.txt.
     systemctl daemon-reload
-    systemctl enable $mc_service
-    systemctl enable $mc_restart_timer
-    systemctl enable $mc_restart_serv
+    systemctl enable $mc_service $mc_restart_timer $mc_restart_serv
 
   elif [ "d-status" = "$arg" ] ; then
-    systemctl status $mc_service
-    systemctl status $mc_restart_timer
-    systemctl status $mc_restart_serv
-    # See also:  journalctl -u $mc_service
+    systemctl status $mc_service $mc_restart_timer $mc_restart_serv
+    # See also:  journalctl -u mcb@mc1.service -u mcb_restart@mc1.timer -u mcb_restart@mc1.service
 
   elif [ "d-start" = "$arg" ] ; then
-    systemctl start $mc_service
-    systemctl start $mc_restart_timer
+    systemctl start $mc_service $mc_restart_timer
 
   elif [ "d-stop" = "$arg" ] ; then
-    systemctl stop $mc_service
-    systemctl stop $mc_restart_timer
+    systemctl stop $mc_service $mc_restart_timer
 
   elif [ "wait-network" = "$arg" ] ; then
     dflt_gateway=$(/sbin/route -n | awk '$4 == "UG" {print $2}')

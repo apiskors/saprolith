@@ -1,0 +1,9 @@
+[Unit]
+Description=Restart Minecraft %I daily
+
+[Timer]
+OnCalendar=*-*-* 04:00
+Persistent=false
+
+[Install]
+WantedBy=timers.target

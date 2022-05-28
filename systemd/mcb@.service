@@ -1,0 +1,24 @@
+[Unit]
+Description=Minecraft Bedrock Server %I
+After=network-online.target local-fs.target
+
+[Service]
+User=mc
+Group=mc
+WorkingDirectory=/data/jails/mc-1/%I
+ExecStart=/bin/sh /data/jails/mc-1/saprolith/mcb -s %I start
+ExecStop=/bin/sh  /data/jails/mc-1/saprolith/mcb -s %I stop
+Type=forking
+GuessMainPID=no
+TimeoutStartSec=60
+Restart=on-failure
+RestartSec=5
+
+ProtectSystem=full
+ProtectHome=read-only
+NoNewPrivileges=true
+PrivateDevices=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target
