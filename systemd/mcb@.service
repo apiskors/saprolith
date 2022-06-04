@@ -2,6 +2,9 @@
 Description=Minecraft Bedrock Server %I
 After=network-online.target local-fs.target
 
+[Install]
+WantedBy=multi-user.target
+
 [Service]
 User=mc
 Group=mc
@@ -27,34 +30,30 @@ PrivateUsers=true
 LockPersonality=true
 RemoveIPC=true
 ProtectHostname=true
-RestrictSUIDSGID = yes
-SystemCallArchitectures = native
-CapabilityBoundingSet =
+RestrictSUIDSGID=yes
+SystemCallArchitectures= native
+CapabilityBoundingSet=
 
 ProtectClock=true
 # According to "systemd-analyze security" ProtectClock does nothing!
 
 PrivateTmp=true
 RestrictRealtime=true
-RestrictAddressFamilies = AF_INET AF_INET6 AF_UNIX
-RestrictAddressFamilies = ~ AF_PACKET
+RestrictAddressFamilies= AF_INET AF_INET6 AF_UNIX
+RestrictAddressFamilies= ~ AF_PACKET
 
-SystemCallFilter = ~ @clock @module @mount @reboot @swap @cpu-emulation @obsolete
+SystemCallFilter= ~ @clock @module @mount @reboot @swap @cpu-emulation @obsolete
 ## MineCraft NEEDS these:  @privileged @chown @setuid
 
 ProtectSystem=full
+#  Do NOT use strict.
 ProtectHome=true
 ReadOnlyDirectories=/lib
 InaccessibleDirectories=/home
 InaccessibleDirectories=/boot
 InaccessibleDirectories=-/var
 InaccessibleDirectories=-/media
-ReadOnlyDirectories=/data
-ReadWriteDirectories=/data/jails/mc-1/%I
-InaccessibleDirectories=-/data/bak
-InaccessibleDirectories=-/data/pub
-InaccessibleDirectories=-/data/vmhome
-InaccessibleDirectories=-/data/atpstuff
 
-[Install]
-WantedBy=multi-user.target
+TemporaryFileSystem= /data:ro
+BindReadOnlyPaths=/data/jails/mc-1
+BindPaths=/data/jails/mc-1/%I
