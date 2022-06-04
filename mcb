@@ -38,8 +38,8 @@ bs_bin="${base_dir}/bedrock_server"
       mc_service="mcb@${mc_server}.service"
 mc_restart_timer="mcb_restart@${mc_server}.timer"
  mc_restart_serv="mcb_restart@${mc_server}.service"
+script_user=`whoami` ; start_dir=`pwd`
 cd "$base_dir" ; mkdir -p logs
-script_user=`whoami`
 
 
 USAGE="Usage:  ${CMDNAME} [-h] [-s SERVER_NAME] CMD [CMD ...]
@@ -124,7 +124,7 @@ do
     fi
 
   elif [ "status" = "$arg" ] ; then
-    mc_screen_session $mc_server ''  # Sets sc_sess.
+    mc_screen_session $mc_server $mc_user  # Sets sc_sess.
     if [ "" = "$sc_sess" ] ; then running_p=0 ; else running_p=1 ; fi
     wait_pid=`echo "$sc_sess" | awk -F. '{print($1)}'`
     echo "Minecraft Server $mc_server running yes-1 or no-0:  $running_p  Shell pid:  $wait_pid"
@@ -211,6 +211,19 @@ do
 
   elif [ "d-stop" = "$arg" ] ; then
     systemctl stop $mc_service $mc_restart_timer
+
+  elif [ "svc-diff" = "$arg" ] ; then
+    lslt="ls -l --full-time"
+    cd "$start_dir"
+    $lslt "${bin_dir}/systemd/mcb@.service"          /etc/systemd/system/mcb@.service
+    diff  "${bin_dir}/systemd/mcb@.service"          /etc/systemd/system/mcb@.service
+    echo
+    $lslt "${bin_dir}/systemd/mcb_restart@.service"  /etc/systemd/system/mcb_restart@.service
+    diff  "${bin_dir}/systemd/mcb_restart@.service"  /etc/systemd/system/mcb_restart@.service
+    echo
+    $lslt "${bin_dir}/systemd/mcb_restart@.timer"    /etc/systemd/system/mcb_restart@.timer
+    diff  "${bin_dir}/systemd/mcb_restart@.timer"    /etc/systemd/system/mcb_restart@.timer
+    cd "$base_dir"
 
   elif [ "wait-network" = "$arg" ] ; then
     dflt_gateway=$(/sbin/route -n | awk '$4 == "UG" {print $2}')
