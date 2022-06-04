@@ -16,12 +16,31 @@ RestartSec=5
 
 NoNewPrivileges=true
 PrivateDevices=true
+DevicePolicy=closed
 MemoryDenyWriteExecute=true
 ProtectKernelModules=true
 ProtectKernelTunables=true
 ProtectKernelLogs=true
 ProtectControlGroups=true
+RestrictNamespaces=true
+PrivateUsers=true
+LockPersonality=true
+RemoveIPC=true
+ProtectHostname=true
+RestrictSUIDSGID = yes
+SystemCallArchitectures = native
+CapabilityBoundingSet =
+
 ProtectClock=true
+# According to "systemd-analyze security" ProtectClock does nothing!
+
+PrivateTmp=true
+RestrictRealtime=true
+RestrictAddressFamilies = AF_INET AF_INET6 AF_UNIX
+RestrictAddressFamilies = ~ AF_PACKET
+
+SystemCallFilter = ~ @clock @module @mount @reboot @swap @cpu-emulation @obsolete
+## MineCraft NEEDS these:  @privileged @chown @setuid
 
 ProtectSystem=full
 ProtectHome=true
