@@ -194,7 +194,7 @@ do
     echo "Backing up server $mc_server to:  $f_bak"
     cd "$jail_dir"
 
-    tar -I zstdmt -pcf "$f_bak" ${mc_server}/*.json ${mc_server}/worlds
+    tar -I zstdmt -pcf "$f_bak" ${mc_server}/*.json ${mc_server}/worlds ${mc_server}/logs
     cd "$base_dir"
 
   elif [ "d-reload" = "$arg" ] ; then
