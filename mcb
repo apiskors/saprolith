@@ -9,6 +9,7 @@
 mc_user=mc ; mc_server=mc1
 jail_dir=/data/jails/mc-1
 bak_dir=/data/jails/mc-1/mc-backups
+dl_dir=/data/pub/download/minecraft/bedrock-server
 # See also base_dir below, where the individual server actually lives.
 
 
@@ -225,12 +226,29 @@ do
     diff  "${bin_dir}/systemd/mcb_restart@.timer"    /etc/systemd/system/mcb_restart@.timer
     cd "$base_dir"
 
-  elif [ "wait-network" = "$arg" ] ; then
-    dflt_gateway=$(/sbin/route -n | awk '$4 == "UG" {print $2}')
-    if [ "" = "$dflt_gateway" ] ; then
-      echo "Warning: ${CMDNAME}: Network is not up yet." 1>&2
-      echo "TODO: Waiting not yet implemented." 1>&2
+  elif [ "download-server" = "$arg" ] ; then
+    # This downloads the the server software, but only if we do not
+    # already have the same version number.
+
+    cd "$dl_dir"
+    curl_opts="-s -H 'Accept-Encoding: identity' -H 'Accept-Language: en' -L -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.33 (KHTML, like Gecko) Chrome/90.0.$RandNum.212 Safari/537.33'"
+    hh=`eval curl $curl_opts https://minecraft.net/en-us/download/server/bedrock/`
+    url=`echo $hh | grep -o 'https://minecraft.azureedge.net/bin-linux/[^"]*'`
+    new_file=`echo $url | grep -o '[^/]*[.]zip$'`
+    new_ver=`echo $url | grep -o '[0-9.]*[.]zip$'`
+    have_versions=`ls -1 ${dl_dir}/bedrock*.zip | grep -o '[0-9.]*[.]zip$'`
+
+    new_p=1 ; for oo in $have_versions ; do
+      if [ "$new_ver" = "$oo" ] ; then
+        new_p=0 ; break
+      fi
+    done
+    if [ 1 -eq "$new_p" ] ; then
+      echo "File: $new_file  New_p: $new_p  Version: $new_ver  URL: $url"
+      echo "Downloading new file now from:  $url"
+      eval curl $curl_opts -o "$new_file" "$url"
     fi
+    cd "$base_dir"
 
   else
     echo "Error: ${CMDNAME}: Unknown command argument:  $arg" 1>&2
