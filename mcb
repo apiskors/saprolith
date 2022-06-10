@@ -49,11 +49,12 @@ Description:
   under screen, preferably started via SystemD systemctl.
 Commands:
   status d-status d-stop backup d-start [etc.]
+  Please read the script itself for details.
 Options:
   -h : Show this help.
   -s  SERVER_NAME  :  Short name of server.  Currently:  $mc_server
       Base directory of server will be:  $base_dir
-  -u : Linux user that will run the server.  Currently:  $mc_user
+  -u : Linux user that runs the server.  Currently:  $mc_user
 "
 
 
@@ -198,10 +199,19 @@ do
     tar -I zstdmt -pcf "$f_bak" ${mc_server}/*.json ${mc_server}/server.properties ${mc_server}/worlds ${mc_server}/logs
     cd "$base_dir"
 
-  elif [ "d-reload" = "$arg" ] ; then
+  elif [ "d-enable" = "$arg" ] ; then
     # See install instructions in readme.txt.
+    # Do this at least once when installing a mc_server instance, e.g. "mc1" or "mc2".
     systemctl daemon-reload
     systemctl enable $mc_service $mc_restart_timer
+
+  elif [ "d-disable" = "$arg" ] ; then
+    # Do this when removing an old mc_server instance.  E.g., if you
+    # upgraded from mc1 to mc2, do this for mc1 so it will not try to
+    # auto-start on boot.
+
+    systemctl daemon-reload
+    systemctl disable $mc_service $mc_restart_timer $mc_restart_serv
 
   elif [ "d-status" = "$arg" ] ; then
     systemctl status $mc_service $mc_restart_timer $mc_restart_serv
