@@ -119,7 +119,7 @@ do
       echo "Minecraft Server $mc_server is already running under screen!" 1>&2
       print_running_info $base_dir $mc_server
     else
-      f_log="${base_dir}/logs/${mc_server}.$(date +%Y-%m-%d).log"
+      f_log="${base_dir}/logs/${mc_server}.$(date +%Y-%m).log"
       echo "Starting Minecraft Server:  $mc_server  As Linux user:  $script_user"
       echo "Logging to file:  $f_log"
       screen -e^Oo -L -Logfile $f_log -dm -S $mc_server /bin/sh -c "LD_LIBRARY_PATH=$base_dir $bs_bin"
