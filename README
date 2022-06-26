@@ -1,0 +1,357 @@
+
+Saprolith:
+------------------------------------------------------------
+
+Run and control the Minecraft Bedrock Edition server on Linux, under
+SystemD, using the "mcb" shell script and SystemD service files
+provided here.
+
+
+Download the Server Software from Mojang:
+------------------------------------------------------------
+
+Download the "Minecraft Dedicated Server software for Ubuntu (Linux)"
+from:
+
+  https://www.minecraft.net/en-us/download/server/bedrock
+
+Note that Mojang/Microsoft update the server periodically, and do NOT
+make older versions available for download!  Different major versions
+are typically NOT compatible with each other, so clients and servers
+must each be running at least the same major version.
+
+Mojang also has a bad habit of sometimes using version numbers that
+are out of sequence.  E.g., in early May 2022, their current
+Production server version was 1.18.33.02, which matched the client
+version.  In late May, they updated the server to 1.19.10.20, which
+was a bogus version number assigned to what was in fact a beta release
+of the upcoming 1.19.0.0.
+
+At that time all normal client software was still running 1.18.x, and
+so could NOT work with the 1.19.x server at all.  Eventually, in early
+June, Mojang finally released the real Production 1.19.1.01 server
+software, and clients started auto-updating to that version within the
+next few weeks.
+
+Thus I do NOT recommend ever auto-installing any new version of
+Bedrock Server, but I DO suggest auto-downloading every new version
+for later use!
+
+The script offers a "download-server" command, which you probably want
+to schedule in your crontab once a day or so.  It is careful to always
+embed the date in the filename when download.  Thus at the time I'm
+writing this, I have these saved versions of the Linux server software:
+
+  bedrock-server_2022-05-14_1.18.33.02.zip
+  bedrock-server_2022-05-28_1.19.10.20.zip
+  bedrock-server_2022-06-07_1.19.1.01.zip
+  bedrock-server_2022-06-23_1.19.2.02.zip
+
+
+Install:
+------------------------------------------------------------
+
+The script does NOT offer an install command.  Perhaps I will add one
+eventually, if I end up installing/upgrading enough times, with a
+repeatable enough process.  But for now, I recommend you do the
+install manually yourself, following the instructions here.
+
+We ALWAYS want to run the actual server process as Linux user "mc",
+NEVER as your own account.  Create the mc user the normal way (on
+Debian or Ubuntu), something like this:
+
+  adduser --disabled-password --group mc
+
+Then make sure that your Linux account (with sudo) is also a member of
+mc's group.
+
+Since we are using multiple Linux users, pay careful attention to
+permission settings on file and directories.  You are likely to mess
+them up at some point.  If you ever get mysterious errors, check the
+file permissions first thing.  A cryptic error message from
+bedrock_server might REALLY just mean that it lacks read access to
+some important file!
+
+[TODO: I should probably add a command to check and correct file
+permissions.]
+
+Install the following Ubuntu packages:
+
+  sudo apt install  screen sysstat zstd
+
+Use Git to clone this project, and put your copy wherever you want.
+Then open up your copy of these three files:
+
+  mcb  systemd/mcb@.service  systemd/mcb_restart@.service
+
+And search for all occurences of "/data" in those files.  Those are
+pathnames pointing to either directories or files.  Most of them are
+near the top of the files, for easy modification.  Change each of
+those settings to the values YOU want.  Those paths are the only
+settings that you MUST edit.
+
+For the -s "mc_server" setting, I STRONGLY recommend that you always
+use a simple ASCII alphanumeric string with NO punctuation characters
+of any sort, not even dashes.  (Underscores are probably ok.)  I
+usually just use "mc1", "mc2", "mc3", etc.  This is because SystemD's
+
+Template unit files aggressively escape such strings, converting
+e.g. "my-server-name" into a different (ugly and inconvenient) string.
+This project makes NO attempt to handle such escaped strings; it is
+easiest to just avoid them.  See also:
+
+  https://www.freedesktop.org/software/systemd/man/systemd.unit.html#id-1.6
+  String Escaping for Inclusion in Unit Names
+
+In the script, you may also want to change the default "mc_user" and
+"mc_server", although you can always specify them on the command-line
+instead.
+
+By default, the "mcb_restart@.service" and "mcb_restart@.timer" files
+are configured to backup and restart your Minecraft server every day
+at 4 am.  If you want a different schedule, simply edit those files.
+(And then later then tell SystemD about the changes.)
+
+Once you have those files edited the way you like, use Git to commit
+your changes locally, so you can track your own version history.
+Next, copy the three SystemD service files into the location they'll
+actually run from:
+
+  sudo cp -p systemd/mcb*{.service,.timer} /etc/systemd/system/
+
+It is not convenient to actually put the files in /etc/systemd/system/
+under version control, so what I do is keep them in sync with my
+version-controlled copy in saprolith/systemd/.  The script includes a
+command to compare the files in the two locations with diff like so:
+
+  ./mcb svc-diff
+
+Create the directory where your new bedrock_server will live, and
+unzip the bedrock_server software into it.  In my case:
+
+  cd /data/jails/mc-1/
+  umask 002 ; mkdir mc3 ; chgrp mc mc3 ; chmod 2775 mc3
+  cd /data/jails/mc-1/mc3/
+  sudo -u mc unzip /data/pub/download/minecraft/bedrock-server/bedrock-server_2022-06-23_1.19.2.02.zip
+
+Next shut down your running bedrock_server (if any), take a backup,
+LEAVE it down, and restore that latest backup into your new directory
+above.  We might as well also disable your old SystemD service (if
+any) now, rather than waiting till later.
+
+Note that restoring the backup from your old "mc2" server creates an
+"mc2" subdirectory inside the new "mc3".  This lets you compare the
+old files to any new stock versions from Mojang.  E.g., you might want
+to examine the new stock server.properties before you replace it with
+your own old file.
+
+Also, you want most but NOT necessarily all files from your backup.
+In particular, (so far) I think the valid_known_packs.json is specific
+to the version of the software you will run, NOT to the world you have
+saved.  So I recommend NOT restoring that file.
+
+  ./mcb -s mc2 d-status
+  sudo ./mcb -s mc2 d-stop backup d-disable
+  cd /data/jails/mc-1/mc3/ ; umask 002
+  sudo -u mc tar xf /data/jails/mc-1/mc-backups/mc2.2022-06-26T13-53-08.tar.zst
+  rm mc2/valid_known_packs.json
+  mv mc2/* . ; rmdir mc2
+
+Your old worlds/, server.properties, allowlist.json, etc. should now
+be restored into your new directory.  If you are starting a new server
+from scratch, edit your "server.properties" etc. as you like.
+
+Enable your new server i SystemD, start it up, and then check that the
+server side of things seems to be working correctly:
+
+  sudo ./mcb -s mc3 d-enable d-start
+  ./mcb -s mc3 d-status
+  ps -u mc -f
+  tail /data/jails/mc-1/mc3/logs/mc3.2022-06.log
+  journalctl -n 50 -u mcb@mc3.service
+  journalctl -n 50 -u mcb_restart@mc3.service -u mcb_restart@mc3.timer
+
+Finally, open up your Minecraft client, and verify that it can connect
+to and play in your new server world!
+
+
+Regular Operations:
+------------------------------------------------------------
+
+Our SystemD services are configured to automatically start every time
+your Linux box boots, so you normally shouldn't need to do much of
+anything.
+
+As discussed above, you probably want to use crontab to check for and
+download new versionso of bedrock_server every day.  Something like:
+
+13 06 * * *  (umask 002; /data/jails/mc-1/saprolith/mcb download-server)
+
+I definitely recommend reading the script to see what further features
+it supports!
+
+
+In-Game Server Commands:
+------------------------------------------------------------
+
+There are two ways you can give commands to the running
+bedrock_server.  One, you can use the script to send them from the
+Linux command line, e.g.:
+
+  sudo -u mc ./mcb -s mc3 cmd 'say Everybody having fun?'
+
+Or, you can take over the screen session that's running the
+bedrock_server, type your commands normally at the console, then
+detach from the screen session and leave it running.  Something like
+this:
+
+  sudo -u mc screen -list
+  sudo -u mc screen -d -r mc3
+
+  gamerule showcoordinates true
+  say Hey Everybody, GPS coordinates should be turned on now.
+  allowlist add MyFavoritePlayer
+  allowlist reload
+  Ctrl-o d
+
+
+Design and Implementation Notes:
+------------------------------------------------------------
+
+This tool is a relatively simple Bourne Shell script that you run
+as-is, possibly after changing some default settings near the top of
+the script.  It does not need to be installed in any particular way,
+and ONE copy of the script should work for any number of Minecraft
+servers you wish to run.
+
+It was inspired by, and some bits copied from, the MinecraftBedrockServer
+scripts by James Chambers:
+
+  https://github.com/TheRemote/MinecraftBedrockServer
+  https://jamesachambers.com/minecraft-bedrock-edition-ubuntu-dedicated-server-guide/
+
+This tool purposely does NOT include many of Chambers's features, as I
+wanted something simpler, easier for me to extend, and using certain
+different approaches.  But his scripts are a valuable source of
+examples of how to do many tasks.
+
+I developed and tested this only on Linux, currently Ubuntu 20.04.4 LTS.
+It may well require tweaking for other distributions.
+
+This project includes three SystemD scripts in its "systemd" subdirectory.
+
+Because they use SystemD's "templating" feature (with %I etc.), these
+three files plus the mcb script itself are all you need.  You will
+need to tweak the hard-coded path names, but otherwise this set of
+files should work as-is for any number of servers you want to run.
+
+The shell script uses /bin/sh.  Bash is not be necessary.  However, my
+Linux /bin/sh is actually dash.  Truly ancient Bourne Shell versions
+(sometimes included with non-Linux Unix systems) would probably break
+on trivial syntax errors, and might also break in trickier more
+fundamental ways.  (E.g., modern Bourne shells always have SEPARATE
+positional parameter lists for individual functions vs. the whole
+script, but some older shells did not.)
+
+Mojang's "alpha" Minecraft bedrock_server is not a traditional Unix
+daemon, it runs attached to a terminal in the foreground.  Also,
+unlike their Java Edition server, which can accept commands via the
+RCON protocol, the ONLY way to give bedrock_server commands is via its
+terminal.
+
+On Linux there are many different ways to "daemonize" a foreground
+terminal app like bedrock_server.  For discussion of some of the
+options, see e.g.:
+
+  https://unix.stackexchange.com/questions/453998/systemd-connect-to-stdin-stdout-after-service-has-started
+  https://blogs.gentoo.org/marecki/2020/09/16/console-bound-systemd-services-the-right-way/
+
+Here I have certain specific requirements:
+1. Run bedrock_server in the background, from the SystemD init service.
+2. Give a way to write to the console's stdin, for issuing commands.
+3. Log all stdout from the console to a file, so we can easily see what
+   the server says has been happening.
+
+It is possible to do both [1] and [2] with SystemD alone.  However
+some of that is tricky, and I don't see any good way to do [3]
+(logging) at all.  Yes, SystemD's journalctl is useful, but I don't
+want ALL bedrock_server output to go to the SystemD journal.
+
+dtach is smaller and simpler than Gnu Screen, should have a smaller
+attack surface, and is likely easier to run inside a chroot jail (or
+other similar confined environment).  It should do [1] and [2] just as
+well as screen, but it lack's screen's "-Logfile" option, so AFAICT
+[3] is not possible.  (I have no idea whether it would be feasible to
+add logfile support to dtach.)
+
+Note that the bedrock_server binary already prefixes most of its
+output with its own timestamps.  If you really want to pre-pend your
+own additional timestamps, you can easily do so by piping stdout
+through Awk.  (mawk and gawk both have strftime now, so either will
+work.)  So in the script, you'd change the command string you pass to
+'/bin/sh -c' from this:
+  "LD_LIBRARY_PATH=$base_dir $bs_bin"
+to something like this:
+  "LD_LIBRARY_PATH=$base_dir $bs_bin | awk '{ print strftime(\"[%Y-%m-%d %H:%M:%S %z %a]\"), \$0 }'"
+
+My use of "sudo -u $mc_user" when "backup" calls mc_screen_session()
+seems a bit ugly, but I couldn't think of anything better.  Of course
+my Linux account has sudo, while mc's does not.  This article has some
+interesting related commentary:
+
+  http://jdebp.info/FGA/dont-abuse-su-for-dropping-privileges.html
+
+But I think its criticisms (and advice to use setuidgid, setpriv, or
+the like) are not relevent here, as I (typically) do NOT want to run
+the script as root and then drop privileges by switching to the mc
+user.  Rather I am running the script as me, and really do need to
+explicitly switch to user mc for certain commands.
+
+
+Security Notes:
+------------------------------------------------------------
+
+We are running the bedrock_server binary provided by Mojang/Microsoft,
+and have no ability to audit its source code in any way.  Oh well.
+That means the best we can do is to limit the damage if/when a remote
+attacker manages to compromise the running bedrock_server process.
+Fortunately modern Linux distributions give us tools to help with that.
+
+In "systemd/mcb@.service", I turn on many SystemD security features.
+This seems like enough to me, while still keeping things fairly simple.
+
+It is of course possible that some future bedrock_server will include
+new features that break due to those security restrictions.  If so,
+you can test the obvious way, by repeatedly commenting out various
+lines in the service file, restarting the service, and seeing whether
+it works correctly.  That's how I figured out that for SystemCallFilter,
+the bedrock_server NEEDS @privileged, @chown, and @setuid, but it's ok
+to turn off most of the others.
+
+If you want to lock things down further, there are two approaches you
+could try:
+
+One, right now a remote attacker who takes control of the running
+bedrock_server process would have read-access to all the normal Linux
+binaries and libraries (although limited by RestrictSUIDSGID=yes,
+etc.), and could attempt to use them for some sort of privilege
+escalation attack.
+
+To further reduce that attack surface you could try using the SystemD
+TemporaryFileSystem, BindReadOnlyPaths, etc. directives to hide ALL
+the normal Linux binaries and libraries, and then make only the bare
+minimum available to the running bedrock_server.  (But since we are
+using dash and screen. that "bare minimum" might not be that small.)
+
+Essentially you would build a chroot-like environment, although you'd
+likely want to do it using the SystemD Linux kernel tools, rather than
+the older (but cross-platform) chroot call (and tools to make chroot
+environments easier to set up, like Olivier Sessink's JailKit).
+
+Two, you could run all this inside a virtualized container of some
+sort, such as Red Hat's Podman.  Others have done similar setups, e.g.:
+
+  https://github.com/TheRemote/Legendary-Bedrock-Container
+  https://jamesachambers.com/legendary-minecraft-bedrock-container/
+
+Good luck!
