@@ -292,6 +292,7 @@ do
     fi
 
     cd "$jail_dir" ; umask 002 ; mkdir -p "$upgrade_dir"
+    if [ $? -gt 0 ] ; then  ok_p=0 ; fi
     if [ "root" != "$script_user" ] ; then
       ok_p=0
       echo "Error: ${CMDNAME}: The upgrade MUST be run as root.  Please use sudo." 1>&2
@@ -304,13 +305,14 @@ do
       echo "Error: ${CMDNAME}: The new upgrade-to directory MUST be completely empty:  $upgrade_dir" 1>&2
     fi
 
+    cd "$upgrade_dir"
+    if [ $? -gt 0 ] ; then  ok_p=0 ; fi
     if [ "$ok_p" -lt 1 ] ; then
       echo "Turning OFF actual upgrade, PRETENDING to upgrade for debugging purposes..." 1>&2
     fi
 
     echo "Using new Bedrock Server software:  $zip_path"
     echo "Unzipping into:  $upgrade_dir"
-    cd "$upgrade_dir"
     if [ "$ok_p" -ge 1 ] ; then
       sudo -u "$mc_user" unzip -q "$zip_path"
       mkdir -p NEW-stock
