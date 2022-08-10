@@ -6,7 +6,7 @@
 
 
 # Defaults, you may want to change these:
-mc_user=mc ; mc_server=mc1
+mc_user=mc ; mc_server=mc1 ; mc_serv_2=mc2
 jail_dir=/data/jails/mc-1
 bak_dir=/data/jails/mc-1/mc-backups
 dl_dir=/data/pub/download/minecraft/bedrock-server
@@ -14,14 +14,18 @@ dl_dir=/data/pub/download/minecraft/bedrock-server
 
 
 print_help_only_p=0 ; bad_args_exit_p=0
-while getopts hs:u: OPT
+while getopts hs:n:u:z: OPT
 do
   case $OPT in
     h)  print_help_only_p=1
         ;;
+    u)  mc_user=$OPTARG
+        ;;
     s)  mc_server=$OPTARG
         ;;
-    u)  mc_user=$OPTARG
+    n)  mc_serv_2=$OPTARG
+        ;;
+    z)  zip_file=$OPTARG
         ;;
     \?)
         print_help_only_p=1
@@ -32,7 +36,7 @@ do
 done
 shift `expr $OPTIND - 1`
 
-CMDNAME=`basename $0` ; bin_dir=`dirname $0`
+CMDNAME=`basename $0` ; bin_dir=`dirname $0` ; cmd_path=`realpath $0`
 umask 002
 base_dir="${jail_dir}/${mc_server}"
 bs_bin="${base_dir}/bedrock_server"
@@ -52,9 +56,13 @@ Commands:
   Please read the script itself for details.
 Options:
   -h : Show this help.
+  -u : Linux user that runs the server.  Currently:  $mc_user
   -s  SERVER_NAME  :  Short name of server.  Currently:  $mc_server
       Base directory of server will be:  $base_dir
-  -u : Linux user that runs the server.  Currently:  $mc_user
+  -n  NEW_SERVER_NAME  :  Short name of new server after upgrade.  
+      Only used during upgrade process.  Currently:  $mc_serv_2
+  -z  BEDROCK_ZIP_FILE  :  Zip file of new server software to upgrade to.
+      E.g.:  bedrock-server_2022-08-10_1.19.20.02.zip
 "
 
 
@@ -261,6 +269,75 @@ do
     fi
     cd "$base_dir"
 
+  elif [ "upgrade" = "$arg" ] ; then
+    ok_p=1
+    upgrade_dir="${jail_dir}/${mc_serv_2}"
+    zip_latest_path=`ls -1t ${dl_dir}/bedrock-server_*.zip | head -n 1`
+    zip_latest_file=`basename $zip_latest_path`
+
+    if [ "" = "$zip_file" ] ; then
+      ok_p=0
+      echo "Error: ${CMDNAME}: To use the upgrade command you MUST specify '-z BEDROCK_ZIP_FILE', e.g.:" 1>&2
+      echo "   sudo ${CMDNAME} -s $mc_server -n $mc_serv_2 -z $zip_latest_file upgrade" 1>&2
+    fi
+
+    zip_path=""
+    zp_1=`realpath -q "${zip_file}"`
+    if [ "" = "$zip_path" -a -e "$zp_1" ] ; then  zip_path="$zp_1" ; fi
+    zp_1=`realpath -q "${dl_dir}/${zip_file}"`
+    if [ "" = "$zip_path" -a -e "$zp_1" ] ; then  zip_path="$zp_1" ; fi
+    if [ "" = "$zip_path" ] ; then
+      ok_p=0
+      echo "Error: ${CMDNAME}: Cannot find zip file:  ${zip_file}" 1>&2
+    fi
+
+    cd "$jail_dir" ; umask 002 ; mkdir -p "$upgrade_dir"
+    if [ "root" != "$script_user" ] ; then
+      ok_p=0
+      echo "Error: ${CMDNAME}: The upgrade MUST be run as root.  Please use sudo." 1>&2
+    else
+      chmod 2775 "$upgrade_dir" ; chgrp "$mc_user" "$upgrade_dir"
+    fi
+    n_files=`find "$upgrade_dir" -mindepth 1 -print | wc -l`
+    if [ "$n_files" -gt 0 ] ; then
+      ok_p=0
+      echo "Error: ${CMDNAME}: The new upgrade-to directory MUST be completely empty:  $upgrade_dir" 1>&2
+    fi
+
+    if [ "$ok_p" -lt 1 ] ; then
+      cd "$base_dir" ; continue
+    fi
+
+    echo "Using new Bedrock Server software:  $zip_path"
+    echo "Unzipping into:  $upgrade_dir"
+    cd "$upgrade_dir"
+    if [ "$ok_p" -ge 1 ] ; then
+      sudo -u "$mc_user" unzip -q "$zip_path"
+      mkdir -p NEW-stock
+      cp -p allowlist.json permissions.json server.properties NEW-stock/
+    fi
+
+    echo "Turning off and backing up old server:  $mc_server"
+    if [ "$ok_p" -ge 1 ] ; then
+      sudo "$cmd_path" -u $mc_user -s $mc_server d-stop backup d-disable
+    fi
+    f_bak=`ls -1t ${bak_dir}/${mc_server}.*.tar.zst | head -n 1`
+
+    echo "Restoring from latest backup file:  $f_bak"
+    if [ "$ok_p" -ge 1 ] ; then
+      sudo -u "$mc_user" tar xf "$f_bak"
+      old_dir="OLD-${mc_server}" ; mv "$mc_server" "$old_dir"
+      rm -f "$old_dir/valid_known_packs.json"
+      mv ${old_dir}/* . ; rmdir ${old_dir}
+    fi
+
+    echo "Turning on new server:  $mc_serv_2"
+    if [ "$ok_p" -ge 1 ] ; then
+      sudo "$cmd_path" -u $mc_user -s $mc_serv_2 d-enable d-start d-status
+    fi
+    ps -u $mc_user -f
+
+    cd "$base_dir"
   else
     echo "Error: ${CMDNAME}: Unknown command argument:  $arg" 1>&2
   fi
