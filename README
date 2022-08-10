@@ -48,13 +48,13 @@ writing this, I have these saved versions of the Linux server software:
   bedrock-server_2022-06-23_1.19.2.02.zip
 
 
-Install:
+Initial Install:
 ------------------------------------------------------------
 
-The script does NOT offer an install command.  Perhaps I will add one
-eventually, if I end up installing/upgrading enough times, with a
-repeatable enough process.  But for now, I recommend you do the
-install manually yourself, following the instructions here.
+The script does NOT offer an initial install command.  It DOES have an
+upgrade command - more on that below.
+
+Here's how to manuall do the initial install:
 
 We ALWAYS want to run the actual server process as Linux user "mc",
 NEVER as your own account.  Create the mc user the normal way (on
@@ -80,7 +80,7 @@ Install the following Ubuntu packages:
   sudo apt install  screen sysstat zstd
 
 Use Git to clone this project, and put your copy wherever you want.
-Then open up your copy of these three files:
+Then open up your copies of these three files:
 
   mcb  systemd/mcb@.service  systemd/mcb_restart@.service
 
@@ -94,7 +94,6 @@ For the -s "mc_server" setting, I STRONGLY recommend that you always
 use a simple ASCII alphanumeric string with NO punctuation characters
 of any sort, not even dashes.  (Underscores are probably ok.)  I
 usually just use "mc1", "mc2", "mc3", etc.  This is because SystemD's
-
 Template unit files aggressively escape such strings, converting
 e.g. "my-server-name" into a different (ugly and inconvenient) string.
 This project makes NO attempt to handle such escaped strings; it is
@@ -110,7 +109,7 @@ instead.
 By default, the "mcb_restart@.service" and "mcb_restart@.timer" files
 are configured to backup and restart your Minecraft server every day
 at 4 am.  If you want a different schedule, simply edit those files.
-(And then later then tell SystemD about the changes.)
+(And then later tell SystemD about the changes.)
 
 Once you have those files edited the way you like, use Git to commit
 your changes locally, so you can track your own version history.
@@ -119,15 +118,16 @@ actually run from:
 
   sudo cp -p systemd/mcb*{.service,.timer} /etc/systemd/system/
 
-It is not convenient to actually put the files in /etc/systemd/system/
-under version control, so what I do is keep them in sync with my
-version-controlled copy in saprolith/systemd/.  The script includes a
-command to compare the files in the two locations with diff like so:
+It is not convenient to actually use version control on the live
+/etc/systemd/system/mcb* files, so what I do is keep them in sync with
+my version-controlled copy in saprolith/systemd/.  The script includes
+a command to compare the files in the two locations with diff like so:
 
   ./mcb svc-diff
 
 Create the directory where your new bedrock_server will live, and
-unzip the bedrock_server software into it.  In my case:
+unzip the bedrock_server software into it.  In my case here, my new
+server is named "mc3", so:
 
   cd /data/jails/mc-1/
   umask 002 ; mkdir mc3 ; chgrp mc mc3 ; chmod 2775 mc3
@@ -136,8 +136,8 @@ unzip the bedrock_server software into it.  In my case:
 
 Next shut down your running bedrock_server (if any), take a backup,
 LEAVE it down, and restore that latest backup into your new directory
-above.  We might as well also disable your old SystemD service (if
-any) now, rather than waiting till later.
+above.  We also should disable your old SystemD service (if any) now,
+rather than waiting till later.
 
 Note that restoring the backup from your old "mc2" server creates an
 "mc2" subdirectory inside the new "mc3".  This lets you compare the
@@ -161,7 +161,7 @@ Your old worlds/, server.properties, allowlist.json, etc. should now
 be restored into your new directory.  If you are starting a new server
 from scratch, edit your "server.properties" etc. as you like.
 
-Enable your new server i SystemD, start it up, and then check that the
+Enable your new server SystemD, start it up, and then check that the
 server side of things seems to be working correctly:
 
   sudo ./mcb -s mc3 d-enable d-start
@@ -173,6 +173,30 @@ server side of things seems to be working correctly:
 
 Finally, open up your Minecraft client, and verify that it can connect
 to and play in your new server world!
+
+
+Upgrade Install:
+------------------------------------------------------------
+
+To upgrasde, we always install to a new empty directory and restore
+from our backup file.  Your old directory remains as is, untouched,
+until YOU decide to delete it.
+
+You'll have noticed that in the previous "Initial Install" section I
+actually did a manual upgrade.  Essentially that same process is now
+automated.  Here's an example of running it:
+
+  sudo ./mcb -s mc1 -n mc2 -z bedrock-server_2022-08-10_1.19.20.02.zip upgrade
+
+If get some of the settings badly wrong, like leaving off sudo, the
+script will "pretend" to proceed, showing as much as possible of what
+it would do, without actually changing anything important.  So, you
+may wish to run an upgrade command like the above WITHOUT sudo, and
+then finally add sudo at the end when you're convinced you have the
+command line correct.
+
+Be careful.  The upgrade does everything in one shot, it does NOT stop
+and pause for any sort of human interaction.
 
 
 Regular Operations:
