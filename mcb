@@ -305,7 +305,7 @@ do
     fi
 
     if [ "$ok_p" -lt 1 ] ; then
-      cd "$base_dir" ; continue
+      echo "Turning OFF actual upgrade, PRETENDING to upgrade for debugging purposes..." 1>&2
     fi
 
     echo "Using new Bedrock Server software:  $zip_path"
