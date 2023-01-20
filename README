@@ -39,7 +39,7 @@ for later use!
 
 The script offers a "download-server" command, which you probably want
 to schedule in your crontab once a day or so.  It is careful to always
-embed the date in the filename when download.  Thus at the time I'm
+embed the date in the filename when downloaded.  Thus at the time I'm
 writing this, I have these saved versions of the Linux server software:
 
   bedrock-server_2022-05-14_1.18.33.02.zip
@@ -54,7 +54,7 @@ Initial Install:
 The script does NOT offer an initial install command.  It DOES have an
 upgrade command - more on that below.
 
-Here's how to manuall do the initial install:
+Here's how to manually do the initial install:
 
 We ALWAYS want to run the actual server process as Linux user "mc",
 NEVER as your own account.  Create the mc user the normal way (on
@@ -62,11 +62,11 @@ Debian or Ubuntu), something like this:
 
   adduser --disabled-password --group mc
 
-Then make sure that your Linux account (with sudo) is also a member of
-mc's group.
+Then make sure that your personal Linux account (with sudo) is also a
+member of mc's group.
 
 Since we are using multiple Linux users, pay careful attention to
-permission settings on file and directories.  You are likely to mess
+permission settings on files and directories.  You are likely to mess
 them up at some point.  If you ever get mysterious errors, check the
 file permissions first thing.  A cryptic error message from
 bedrock_server might REALLY just mean that it lacks read access to
@@ -111,8 +111,11 @@ are configured to backup and restart your Minecraft server every day
 at 4 am.  If you want a different schedule, simply edit those files.
 (And then later tell SystemD about the changes.)
 
-Once you have those files edited the way you like, use Git to commit
-your changes locally, so you can track your own version history.
+Once you have those files edited the way you like, use should probably
+use Git to commit your changes locally, so you can track your own
+version history.  [TODO: Add tips on how to avoid conflicts with my
+upstream changes.]
+
 Next, copy the three SystemD service files into the location they'll
 actually run from:
 
@@ -178,8 +181,8 @@ to and play in your new server world!
 Upgrade Install:
 ------------------------------------------------------------
 
-To upgrasde, we always install to a new empty directory and restore
-from our backup file.  Your old directory remains as is, untouched,
+To upgrade, we always install to a new empty directory and restore
+from a backup file.  Your old directory remains as is, untouched,
 until YOU decide to delete it.
 
 You'll have noticed that in the previous "Initial Install" section I
@@ -188,12 +191,12 @@ automated.  Here's an example of running it:
 
   sudo ./mcb -s mc1 -n mc2 -z bedrock-server_2022-08-10_1.19.20.02.zip upgrade
 
-If get some of the settings badly wrong, like leaving off sudo, the
-script will "pretend" to proceed, showing as much as possible of what
-it would do, without actually changing anything important.  So, you
-may wish to run an upgrade command like the above WITHOUT sudo, and
-then finally add sudo at the end when you're convinced you have the
-command line correct.
+If I get some of the command-line settings badly wrong above, like
+leaving off sudo, the script will "pretend" to proceed, showing as
+much as possible of what it WOULD do, without actually changing
+anything important.  So, you may wish to run an upgrade command like
+the above WITHOUT sudo as a test run, and then finally add sudo at the
+end when you're convinced you have the command line correct.
 
 Be careful.  The upgrade does everything in one shot, it does NOT stop
 and pause for any sort of human interaction.
@@ -207,7 +210,7 @@ your Linux box boots, so you normally shouldn't need to do much of
 anything.
 
 As discussed above, you probably want to use crontab to check for and
-download new versionso of bedrock_server every day.  Something like:
+download new versions of bedrock_server every day.  Something like:
 
 13 06 * * *  (umask 002; /data/jails/mc-1/saprolith/mcb download-server)
 
@@ -218,9 +221,8 @@ it supports!
 In-Game Server Commands:
 ------------------------------------------------------------
 
-There are two ways you can give commands to the running
-bedrock_server.  One, you can use the script to send them from the
-Linux command line, e.g.:
+There are two ways you can give commands to the running bedrock_server.
+One, you can use the script to send them from the Linux command line, e.g.:
 
   sudo -u mc ./mcb -s mc3 cmd 'say Everybody having fun?'
 
@@ -268,6 +270,11 @@ Because they use SystemD's "templating" feature (with %I etc.), these
 three files plus the mcb script itself are all you need.  You will
 need to tweak the hard-coded path names, but otherwise this set of
 files should work as-is for any number of servers you want to run.
+
+Big Caveat:  Right now running multiple Bedrock servers probably will
+NOT work, but this is due to well-known limitations and bugs in
+Mojang's bedrock_server software.  In the future perhaps I will add
+workarounds for those problems to this project.
 
 The shell script uses /bin/sh.  Bash is not be necessary.  However, my
 Linux /bin/sh is actually dash.  Truly ancient Bourne Shell versions
@@ -365,12 +372,13 @@ To further reduce that attack surface you could try using the SystemD
 TemporaryFileSystem, BindReadOnlyPaths, etc. directives to hide ALL
 the normal Linux binaries and libraries, and then make only the bare
 minimum available to the running bedrock_server.  (But since we are
-using dash and screen. that "bare minimum" might not be that small.)
+using dash and screen, that "bare minimum" might be rather large.)
 
 Essentially you would build a chroot-like environment, although you'd
 likely want to do it using the SystemD Linux kernel tools, rather than
-the older (but cross-platform) chroot call (and tools to make chroot
-environments easier to set up, like Olivier Sessink's JailKit).
+the older (but cross-platform) chroot call.  (If you did use chroot,
+you'd probably want to use a tool to make setting up the the chroot
+environment easier, like Olivier Sessink's JailKit.)
 
 Two, you could run all this inside a virtualized container of some
 sort, such as Red Hat's Podman.  Others have done similar setups, e.g.:
