@@ -93,12 +93,11 @@ mc_screen_session() {
     foo=$(sudo -u $mc_user screen -wipe 2>&1)
     sc_sess=`sudo -u $mc_user screen -list | grep "$mc_server" | head -n 1 | awk '{print($mc_server)}'`
   fi
-
 }
 
 print_running_info() {
   local f_log
-  f_log=`ls -1t ${1}/logs/${2}.* | head -n 1`
+  f_log=`ls -1t ${1}/logs/${2}.*.log | head -n 1`
   echo "Log file is probably:  $f_log"
   echo "To get to its Server console do:  screen -e^Oo -r ${2}"
   echo "Disconnect from that screen session with:  Ctrl-o d"
@@ -247,6 +246,7 @@ do
   elif [ "download-server" = "$arg" ] ; then
     # This downloads the the server software, but only if we do not
     # already have the same version number.
+    # See also:  https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs
 
     cd "$dl_dir"
     now_ymd=`date +%Y-%m-%d`
