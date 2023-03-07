@@ -15,10 +15,11 @@ from:
 
   https://www.minecraft.net/en-us/download/server/bedrock
 
-Note that Mojang/Microsoft update the server periodically, and do NOT
-make older versions available for download!  Different major versions
-are typically NOT compatible with each other, so clients and servers
-must each be running at least the same major version.
+Note that Mojang/Microsoft periodically updates the server, and does
+NOT make older versions available for download!  Different versions
+are typically NOT compatible with each other.  Clients and servers
+must each be running at least the same major version, and usually the
+exact same version.
 
 Mojang also has a bad habit of sometimes using version numbers that
 are out of sequence.  E.g., in early May 2022, their current
@@ -33,19 +34,37 @@ June, Mojang finally released the real Production 1.19.1.01 server
 software, and clients started auto-updating to that version within the
 next few weeks.
 
-Thus I do NOT recommend ever auto-installing any new version of
-Bedrock Server, but I DO suggest auto-downloading every new version
-for later use!
+Thus I do NOT recommend auto-installing new versions of Bedrock Server,
+but I DO suggest auto-downloading every new version for later use!
 
-The script offers a "download-server" command, which you probably want
-to schedule in your crontab once a day or so.  It is careful to always
-embed the date in the filename when downloaded.  Thus at the time I'm
-writing this, I have these saved versions of the Linux server software:
+The script offers a "download-server" command, which you should schedule
+in your crontab once a day or so.  It is careful to always embed the
+date in the filename when downloaded.  Thus at the time I'm writing
+this, I have these saved versions of the Linux server software:
 
   bedrock-server_2022-05-14_1.18.33.02.zip
   bedrock-server_2022-05-28_1.19.10.20.zip
   bedrock-server_2022-06-07_1.19.1.01.zip
   bedrock-server_2022-06-23_1.19.2.02.zip
+
+
+Ubuntu Prerequisites:
+------------------------------------------------------------
+As this bug ticket describes:
+
+  https://bugs.mojang.com/browse/BDS-16913
+  Bedrock server won't start on Ubuntu 22.04 LTS
+
+Bedrock Server still required libssl1.1, but Ubuntu 22.04 (jammy)
+ships only with libssl3, and no longer includes libssl1.1 at all.  The
+workaround is to simply install libssl1.1 from the older Ubuntu 20.04
+(focal), like so:
+
+  echo "deb http://security.ubuntu.com/ubuntu focal-security main" | sudo tee /etc/apt/sources.list.d/focal-security.list
+  sudo apt update && sudo apt install libssl1.1
+
+This may no longer be necessary, as that ticket suggests it was fixed
+either in bedrock-server 1.19.30 (c. 2022-09-21) or 1.19.51 (2022-12-14).
 
 
 Initial Install:
@@ -164,8 +183,8 @@ Your old worlds/, server.properties, allowlist.json, etc. should now
 be restored into your new directory.  If you are starting a new server
 from scratch, edit your "server.properties" etc. as you like.
 
-Enable your new server SystemD, start it up, and then check that the
-server side of things seems to be working correctly:
+Enable your new server in SystemD, start it up, and then check that
+the server side of things seems to be working correctly:
 
   sudo ./mcb -s mc3 d-enable d-start
   ./mcb -s mc3 d-status
@@ -241,6 +260,38 @@ this:
   Ctrl-o d
 
 
+Known Bugs or Problems:
+------------------------------------------------------------
+
+Running multiple Bedrock servers on the same machine may not work, due
+to well-known limitations and bugs in Mojang's bedrock_server software:
+
+  https://bugs.mojang.com/browse/BDS-1094
+  Additional IPv4 and IPv6 port opening upon starting server
+
+  https://bugs.mojang.com/browse/BDS-3989#comment-979611
+  Default server port is used even if another port is defined
+
+  https://github.com/TheRemote/MinecraftBedrockServer/issues/70#issuecomment-797751279
+  Bedrock Server is not listening to Ports #70
+
+  https://bugs.mojang.com/browse/BDS-10608
+  Can't connect from non-local networks (outside of LAN)
+
+  https://feedback.minecraft.net/hc/en-us/community/posts/360040238051-Multiple-Worlds-on-One-Bedrock-Server?page=1#community_comment_360010427012
+
+So far I haven't actually tried running multiple servers myself.  If I
+do, perhaps I'll add workarounds for the problems to this project.
+
+
+Other Potentially Useful Tools:
+------------------------------------------------------------
+
+Phantom, a proxy to make remote Bedrock Servers look like they are on
+your LAN:
+  https://github.com/jhead/phantom
+
+
 Design and Implementation Notes:
 ------------------------------------------------------------
 
@@ -261,22 +312,17 @@ wanted something simpler, easier for me to extend, and using certain
 different approaches.  But his scripts are a valuable source of
 examples of how to do many tasks.
 
-I developed and tested this only on Linux, currently Ubuntu 20.04.4 LTS.
-It may well require tweaking for other distributions.
+I developed and tested this only on Linux, initially Ubuntu 20.04 LTS,
+and later Ubuntu 22.04 LTS.  It may well require tweaking for other
+distributions.
 
 This project includes three SystemD scripts in its "systemd" subdirectory.
-
 Because they use SystemD's "templating" feature (with %I etc.), these
 three files plus the mcb script itself are all you need.  You will
 need to tweak the hard-coded path names, but otherwise this set of
 files should work as-is for any number of servers you want to run.
 
-Big Caveat:  Right now running multiple Bedrock servers probably will
-NOT work, but this is due to well-known limitations and bugs in
-Mojang's bedrock_server software.  In the future perhaps I will add
-workarounds for those problems to this project.
-
-The shell script uses /bin/sh.  Bash is not be necessary.  However, my
+The shell script uses /bin/sh.  Bash is not necessary.  However, my
 Linux /bin/sh is actually dash.  Truly ancient Bourne Shell versions
 (sometimes included with non-Linux Unix systems) would probably break
 on trivial syntax errors, and might also break in trickier more
