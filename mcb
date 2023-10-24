@@ -251,7 +251,7 @@ do
     cd "$dl_dir"
     now_ymd=`date +%Y-%m-%d`
     curl_opts="-s -H 'Accept-Encoding: identity' -H 'Accept-Language: en' -L -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.33 (KHTML, like Gecko) Chrome/90.0.$RandNum.212 Safari/537.33'"
-    hh=`eval curl $curl_opts https://minecraft.net/en-us/download/server/bedrock/`
+    hh=`eval curl $curl_opts https://www.minecraft.net/en-us/download/server/bedrock/`
     url=`echo $hh | grep -o 'https://minecraft.azureedge.net/bin-linux/[^"]*'`
     new_ver=`echo $url | grep -o '[0-9.]*[.]zip$'`
     have_versions=`ls -1 ${dl_dir}/bedrock*.zip | grep -o '[0-9.]*[.]zip$'`
