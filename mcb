@@ -286,9 +286,9 @@ do
     if [ "" = "$zip_path" -a -e "$zp_1" ] ; then  zip_path="$zp_1" ; fi
     zp_1=`realpath -q "${dl_dir}/${zip_file}"`
     if [ "" = "$zip_path" -a -e "$zp_1" ] ; then  zip_path="$zp_1" ; fi
-    if [ "" = "$zip_path" ] ; then
+    if [ \( "" = "$zip_path" \) -o \( ! -r "$zip_path"  \) -o \( ! -s "$zip_path"  \) ] ; then
       ok_p=0
-      echo "Error: ${CMDNAME}: Cannot find zip file:  ${zip_file}" 1>&2
+      echo "Error: ${CMDNAME}: Cannot find or read zip file:  ${zip_file}" 1>&2
     fi
 
     cd "$jail_dir" ; umask 002 ; mkdir -p "$upgrade_dir"
