@@ -248,10 +248,11 @@ do
     # already have the same version number.
     # See also:  https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs
 
+    DL_URL=https://www.minecraft.net/en-us/download/server/bedrock
     cd "$dl_dir"
     now_ymd=`date +%Y-%m-%d`
     curl_opts="-s -H 'Accept-Encoding: identity' -H 'Accept-Language: en' -L -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.33 (KHTML, like Gecko) Chrome/90.0.$RandNum.212 Safari/537.33'"
-    hh=`eval curl $curl_opts https://www.minecraft.net/en-us/download/server/bedrock/`
+    hh=`eval curl $curl_opts $DL_URL`
     url=`echo $hh | grep -o 'https://[^"]*/bin-linux/[^"]*'`
     # Old url:  https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.30.03.zip
     # New url:  https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.21.41.01.zip
@@ -267,14 +268,32 @@ do
   elif [ "download-server" = "$arg" ] ; then
     # Read the Changelog to guess the URL of the file we need to download.
     # TODO: The assumptions determining the filename are brittle.
+
+    DL_URL=https://www.minecraft.net/en-us/download/server/bedrock
+    CL_URL=https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs
     cd "$dl_dir" ; now_ymd=`date +%Y-%m-%d`
+
+    # TODO: In a real browser, on the download page above, mouseover on
+    # the "DOWNLOAD" button shows the full download link.  So what we
+    # really need is just a way to read that link!  How?
+
+    # TODO: Below, this finds the human-visible "1.21.92" text on the
+    # Changelog page, but the specific version number we actually need,
+    # "1.21.92.1", never appears there.
+    #v2=`lynx -dump -force_html $CL_URL | grep 'Minecraft.*Bedrock' | grep -o '[0-9]*[.][0-9]*[.][0-9]*' | sort -g | uniq | tail -n 1`
+
+    # TODO: Below, I am not sure how/why lynx -dump generates strings like
+    # "bedrock-server_2025-06-29_1.21.92.1.zip".  That result is great,
+    # EXCEPT that it only sometimes appears!  Usually, the most recent
+    # file is instead "bedrock-server_2025-06-06_1.21.84.1.zip'.  What!?
+
     month_1=`date +%Y-%m` ; month_2=`date -d "-1 month" +%Y-%m`
-    hh=`lynx -dump -force_html https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs`
-    f1=`echo $hh | grep -Eo "bedrock-server_(${month_1}|${month_2})[^ ]*[.]zip" | sort | uniq | tail -n 1`
+    hh=`lynx -dump -force_html $CL_URL`
+    f1=`echo $hh | grep -Eo "bedrock-server_(${month_1}|${month_2})[^ ]*[.]zip" | sort -g | uniq | tail -n 1`
     # E.g.:  bedrock-server_2025-06-29_1.21.92.1.zip
-    # But that is NOT the filename used the URL, we need to change it to:
-    #  bedrock-server-1.21.92.1.zip
-    f2=`echo $f1 | sed "s%_2[0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_%-%"`
+    v1=`echo $f1 | grep -o '_[0-9.]*[.]zip' | sed 's%^_%%' | sed 's%[.]zip%%'`
+    # Change to:  bedrock-server-1.21.92.1.zip
+    f2="bedrock-server-${v1}.zip"
     url="https://www.minecraft.net/bedrockdedicatedserver/bin-linux/${f2}"
 
     new_ver=`echo $url | grep -o '[0-9.]*[.]zip$'`
