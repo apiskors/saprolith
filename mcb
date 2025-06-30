@@ -243,7 +243,7 @@ do
     diff  "${bin_dir}/systemd/mcb_restart@.timer"    /etc/systemd/system/mcb_restart@.timer
     cd "$base_dir"
 
-  elif [ "download-server" = "$arg" ] ; then
+  elif [ "dl-server-1" = "$arg" ] ; then
     # This downloads the the server software, but only if we do not
     # already have the same version number.
     # See also:  https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs
@@ -255,6 +255,28 @@ do
     url=`echo $hh | grep -o 'https://[^"]*/bin-linux/[^"]*'`
     # Old url:  https://minecraft.azureedge.net/bin-linux/bedrock-server-1.21.30.03.zip
     # New url:  https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.21.41.01.zip
+    echo "ERROR:  This way of parsing the download page no longer works." 1>&2
+
+    # As of c. 2025-06-13, the HTML of the download page no longer
+    # includes the URL to actually download the file!  You can see it when
+    # you mouseover the DOWNLOAD link, presumably due to some JavaScript
+    # thing.  Once you find it, the the direct download link does still
+    # work, e.g.:
+    # https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.21.92.1.zip
+
+  elif [ "download-server" = "$arg" ] ; then
+    # Read the Changelog to guess the URL of the file we need to download.
+    # TODO: The assumptions determining the filename are brittle.
+    cd "$dl_dir" ; now_ymd=`date +%Y-%m-%d`
+    month_1=`date +%Y-%m` ; month_2=`date -d "-1 month" +%Y-%m`
+    hh=`lynx -dump -force_html https://feedback.minecraft.net/hc/en-us/sections/360001186971-Release-Changelogs`
+    f1=`echo $hh | grep -Eo "bedrock-server_(${month_1}|${month_2})[^ ]*[.]zip" | sort | uniq | tail -n 1`
+    # E.g.:  bedrock-server_2025-06-29_1.21.92.1.zip
+    # But that is NOT the filename used the URL, we need to change it to:
+    #  bedrock-server-1.21.92.1.zip
+    f2=`echo $f1 | sed "s%_2[0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_%-%"`
+    url="https://www.minecraft.net/bedrockdedicatedserver/bin-linux/${f2}"
+
     new_ver=`echo $url | grep -o '[0-9.]*[.]zip$'`
     have_versions=`ls -1 ${dl_dir}/bedrock*.zip | grep -o '[0-9.]*[.]zip$'`
     new_file=`echo $url | grep -o '[^/]*[.]zip$' | sed "s%server-%server_${now_ymd}_%"`
